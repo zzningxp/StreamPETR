@@ -67,9 +67,14 @@ def custom_multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
         prog_bar = mmcv.ProgressBar(len(dataset))
     time.sleep(2)  # This line can prevent deadlock problem in some cases.
     have_mask = False
+    elapsed = []
     for i, data in enumerate(data_loader):
         with torch.no_grad():
+
+            start_time = time.perf_counter()
             result = model(return_loss=False, rescale=True, **data)
+            elapsed.append(time.perf_counter() - start_time)
+
             # encode mask results
             if isinstance(result, dict):
                 if 'bbox_results' in result.keys():
@@ -92,6 +97,10 @@ def custom_multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
             
             for _ in range(batch_size * world_size):
                 prog_bar.update()
+    
+    print()
+    print("Average evaluation time elapsed: %f ms" % sum(elapsed)/len(elapsed)*1000)
+    print()
 
     # collect results from all ranks
     if gpu_collect:

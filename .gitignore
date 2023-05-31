@@ -1,0 +1,9 @@
+*.pyc
+*.json
+*.pth
+*.log
+*.out
+*.out*
+
+mmdetection3d/
+data/nuscenes

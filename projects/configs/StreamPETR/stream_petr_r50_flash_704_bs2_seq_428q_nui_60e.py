@@ -39,9 +39,9 @@ model = dict(
     num_frame_losses=num_frame_losses,
     use_grid_mask=True,
     img_backbone=dict(
-        init_cfg=dict(
-            type='Pretrained', checkpoint="ckpts/cascade_mask_rcnn_r50_fpn_coco-20e_20e_nuim_20201009_124951-40963960.pth",
-            prefix='backbone.'),       
+        #init_cfg=dict(
+        #    type='Pretrained', checkpoint="ckpts/cascade_mask_rcnn_r50_fpn_coco-20e_20e_nuim_20201009_124951-40963960.pth",
+        #    prefix='backbone.'),       
         type='ResNet',
         depth=50,
         num_stages=4,
