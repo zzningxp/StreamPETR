@@ -99,7 +99,7 @@ def custom_multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
                 prog_bar.update()
     
     print()
-    print("Average evaluation time elapsed: %f ms" % sum(elapsed)/len(elapsed)*1000)
+    print("Average evaluation time elapsed:", sum(elapsed)/len(elapsed))
     print()
 
     # collect results from all ranks
