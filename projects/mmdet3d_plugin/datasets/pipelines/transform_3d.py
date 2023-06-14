@@ -15,7 +15,106 @@ import mmcv
 from mmdet.datasets.builder import PIPELINES
 import torch
 from PIL import Image
+from numpy import random
+# import nori2 as nori
+# import refile
+# from skimage import io
+# @PIPELINES.register_module()
+# class LoadMultiViewImageFromNori(object):
+#     """Load multi channel images from a list of separate channel files.
 
+#     Expects results['img_filename'] to be a list of filenames.
+
+#     Args:
+#         to_float32 (bool): Whether to convert the img to float32.
+#             Defaults to False.
+#         color_type (str): Color type of the file. Defaults to 'unchanged'.
+#     """
+
+#     def __init__(self,
+#                  nori_lists=None,
+#                  to_float32=True,
+#                  color_type='unchanged',
+#                  data_prefix=None):
+#         self.nori_lists = nori_lists
+#         self.to_float32 = to_float32
+#         self.color_type = color_type
+#         self.fetcher = nori.Fetcher()
+#         self.data_prefix = data_prefix
+#         self.name2nori = self.decode_nori_list()
+
+#     def decode_nori_list(self):
+#         ret = {}
+#         for nori_list in self.nori_lists:
+#             with refile.smart_open(nori_list, "r") as f:
+#                 for line in f:
+#                     nori_id, filename = line.strip().split()
+#                     ret[filename] = nori_id
+#         return ret
+
+#     def __call__(self, results):
+#         """Call function to load multi-view image from files.
+
+#         Args:
+#             results (dict): Result dict containing multi-view image filenames.
+
+#         Returns:
+#             dict: The result dict containing the multi-view image data. \
+#                 Added keys and values are described below.
+
+#                 - filename (str): Multi-view image filenames.
+#                 - img (np.ndarray): Multi-view image arrays.
+#                 - img_shape (tuple[int]): Shape of multi-view image arrays.
+#                 - ori_shape (tuple[int]): Shape of original image arrays.
+#                 - pad_shape (tuple[int]): Shape of padded image arrays.
+#                 - scale_factor (float): Scale factor.
+#                 - img_norm_cfg (dict): Normalization configuration of images.
+#         """
+
+#         if 'nori_ids' in results.keys():
+#             filename = results['nori_ids']
+#         else:
+#             filename = results['img_filename']
+#         if self.data_prefix is not None:
+#             filename = [x.replace(self.data_prefix, '/data/datasets/nuScenes').replace('/data/Dataset/', '/data/datasets/')  for x in filename]
+#         nori_ids = [self.name2nori[name] if name in self.name2nori.keys() else name for name in filename]
+#         img_bytes = [self.fetcher.get(nori_id) for nori_id in nori_ids]
+
+#         # img is of shape (h, w, c, num_views)
+
+#         try:
+#             img = np.stack(
+#                 [mmcv.imfrombytes(img_byte, self.color_type) for img_byte in img_bytes], axis=-1)
+#         except:
+#             img = np.stack(
+#                 [mmcv.imfrombytes(img_byte, self.color_type)[:900, :1600, :] for img_byte in img_bytes], axis=-1)
+        
+#         if self.to_float32:
+#             img = img.astype(np.float32)
+
+#         results['filename'] = results['img_filename']
+#         # unravel to list, see `DefaultFormatBundle` in formating.py
+#         # which will transpose each image separately and then stack into array
+#         results['img'] = [img[..., i] for i in range(img.shape[-1])]
+#         results['img_shape'] = img.shape
+#         results['ori_shape'] = img.shape
+#         # Set initial values for default meta_keys
+#         results['pad_shape'] = img.shape
+#         results['scale_factor'] = 1.0
+#         num_channels = 1 if len(img.shape) < 3 else img.shape[2]
+
+#         results['img_norm_cfg'] = dict(
+#             mean=np.zeros(num_channels, dtype=np.float32),
+#             std=np.ones(num_channels, dtype=np.float32),
+#             to_rgb=False)
+#         return results
+
+#     def __repr__(self):
+#         """str: Return a string that describes the module."""
+#         repr_str = self.__class__.__name__
+#         repr_str += f'(to_float32={self.to_float32}, '
+#         repr_str += f"color_type='{self.color_type}')"
+#         return repr_str
 
 @PIPELINES.register_module()
 class PadMultiViewImage():

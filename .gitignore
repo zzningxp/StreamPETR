@@ -7,3 +7,4 @@
 
 mmdetection3d/
 data/nuscenes
+work_dirs/

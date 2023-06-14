@@ -11,7 +11,7 @@ plugin_dir='projects/mmdet3d_plugin/'
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 voxel_size = [0.2, 0.2, 8]
 img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+    mean=[103.530, 116.280, 123.675], std=[57.375, 57.120, 58.395], to_rgb=False) # fix img_norm
 # For nuScenes we usually do 10-class detection
 class_names = [
     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
@@ -19,9 +19,9 @@ class_names = [
 ]
 
 num_gpus = 4
-batch_size = 2
+batch_size = 1
 num_iters_per_epoch = 28130 // (num_gpus * batch_size)
-num_epochs = 60
+num_epochs = 24
 
 queue_length = 1
 num_frame_losses = 1
@@ -33,76 +33,57 @@ input_modality = dict(
     use_map=False,
     use_external=True)
 model = dict(
-    type='Petr3D',
-    num_frame_head_grads=num_frame_losses,
-    num_frame_backbone_grads=num_frame_losses,
-    num_frame_losses=num_frame_losses,
+    type='Sparse4D',
     use_grid_mask=True,
+    stride=[8, 16, 32, 64],
+    position_level=[0, 1, 2, 3],
     img_backbone=dict(
-        init_cfg=dict(
-            type='Pretrained', checkpoint="ckpts/cascade_mask_rcnn_r50_fpn_coco-20e_20e_nuim_20201009_124951-40963960.pth",
-            prefix='backbone.'),       
-        type='ResNet',
-        depth=50,
-        num_stages=4,
-        out_indices=(2, 3),
-        frozen_stages=-1,
-        norm_cfg=dict(type='BN2d', requires_grad=False),
+        type='VoVNet', ###use checkpoint to save memory
+        spec_name='V-99-eSE',
         norm_eval=True,
-        with_cp=True,
-        style='pytorch'),
+        frozen_stages=-1,
+        input_ch=3,
+        out_features=('stage2','stage3','stage4','stage5',)),
     img_neck=dict(
-        type='CPFPN',  ###remove unused parameters 
-        in_channels=[1024, 2048],
+        type='FPN',  ###remove unused parameters 
+        start_level=1,
+        add_extra_convs='on_output',
+        relu_before_extra_convs=True,
+        in_channels=[256, 512, 768, 1024],
         out_channels=256,
-        num_outs=2),
+        num_outs=4),
     img_roi_head=dict(
-        type='FocalHead',
+        type='YOLOXHeadCustom',
         num_classes=10,
         in_channels=256,
-        loss_cls2d=dict(
-            type='QualityFocalLoss',
-            use_sigmoid=True,
-            beta=2.0,
-            loss_weight=2.0),
-        loss_centerness=dict(type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
-        loss_bbox2d=dict(type='L1Loss', loss_weight=5.0),
-        loss_iou2d=dict(type='GIoULoss', loss_weight=2.0),
-        loss_centers2d=dict(type='L1Loss', loss_weight=10.0),
-        train_cfg=dict(
-        assigner2d=dict(
-            type='HungarianAssigner2D',
-            cls_cost=dict(type='FocalLossCost', weight=2.),
-            reg_cost=dict(type='BBoxL1Cost', weight=5.0, box_format='xywh'),
-            iou_cost=dict(type='IoUCost', iou_mode='giou', weight=2.0),
-            centers2d_cost=dict(type='BBox3DL1Cost', weight=10.0)))
+        strides=[8, 16, 32, 64],
+        train_cfg=dict(assigner=dict(type='SimOTAAssigner', center_radius=2.5)),
+        test_cfg=dict(score_thr=0.01, nms=dict(type='nms', iou_threshold=0.65)),
         ),
     pts_bbox_head=dict(
-        type='StreamPETRHead',
+        type='SparseHead',
         num_classes=10,
         in_channels=256,
-        num_query=300,
-        memory_len=512,
-        topk_proposals=128,
-        num_propagated=128,
-        with_ego_pos=True,
-        match_with_velo=False,
+        num_query=644,
+        memory_len=1024,
+        topk_proposals=256,
+        num_propagated=256,
         scalar=10, ##noise groups
         noise_scale = 1.0, 
         dn_weight= 1.0, ##dn loss weight
         split = 0.75, ###positive rate
-        LID=True,
-        with_position=True,
-        position_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
+        with_dn=True,
+        with_ego_pos=True,
         code_weights = [2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         transformer=dict(
-            type='PETRTemporalTransformer',
+            type='Detr3DTransformer',
             decoder=dict(
-                type='PETRTransformerDecoder',
-                return_intermediate=True,
+                type='Detr3DTransformerDecoder',
+                embed_dims=256,
                 num_layers=6,
                 transformerlayers=dict(
-                    type='PETRTemporalDecoderLayer',
+                    type='Detr3DTemporalDecoderLayer',
+                    batch_first=True,
                     attn_cfgs=[
                         dict(
                             type='MultiheadAttention',
@@ -110,14 +91,18 @@ model = dict(
                             num_heads=8,
                             dropout=0.1),
                         dict(
-                            type='PETRMultiheadFlashAttention',
+                            type='DeformableFeatureAggregationCuda', 
                             embed_dims=256,
-                            num_heads=8,
-                            dropout=0.1),
+                            num_groups=8,
+                            num_levels=4,
+                            num_cams=6,
+                            dropout=0.1,
+                            num_pts=13,
+                            bias=2.),
                         ],
                     feedforward_channels=2048,
                     ffn_dropout=0.1,
-                    with_cp=True,  ###use checkpoint to save memory
+                    with_cp=False,  ###use checkpoint to save memory
                     operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
                                      'ffn', 'norm')),
             )),
@@ -157,8 +142,8 @@ file_client_args = dict(backend='disk')
 
 
 ida_aug_conf = {
-        "resize_lim": (0.38, 0.55),
-        "final_dim": (256, 704),
+        "resize_lim": (0.47, 0.625),
+        "final_dim": (320, 800),
         "bot_pct_lim": (0.0, 0.0),
         "rot_lim": (0.0, 0.0),
         "H": 900,
@@ -177,7 +162,7 @@ train_pipeline = [
             translation_std=[0, 0, 0],
             scale_ratio_range=[0.95, 1.05],
             reverse_angle=True,
-            training=True,
+            training=True
             ),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
@@ -231,10 +216,10 @@ data = dict(
     nonshuffler_sampler=dict(type='DistributedSampler')
     )
 
+
 optimizer = dict(
     type='AdamW', 
-    #lr=(4e-4 / 16) * (num_gpus * batch_size), # bs 8: 2e-4 || bs 16: 4e-4
-    lr=2e-4,
+    lr=1e-4, # bs 8: 2e-4 || bs 16: 4e-4
     paramwise_cfg=dict(
         custom_keys={
             'img_backbone': dict(lr_mult=0.1), # set to 0.1 always better when apply 2D pretrained.
@@ -256,5 +241,5 @@ find_unused_parameters=False #### when use checkpoint, find_unused_parameters mu
 checkpoint_config = dict(interval=num_iters_per_epoch, max_keep_ckpts=3)
 runner = dict(
     type='IterBasedRunner', max_iters=num_epochs * num_iters_per_epoch)
-load_from=None
+load_from='ckpts/fcos3d_vovnet_imgbackbone-remapped.pth'
 resume_from=None

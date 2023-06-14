@@ -18,10 +18,10 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 ]
 
-num_gpus = 8
+num_gpus = 4
 batch_size = 2
 num_iters_per_epoch = 28130 // (num_gpus * batch_size)
-num_epochs = 24
+num_epochs = 30
 
 queue_length = 1
 num_frame_losses = 1
